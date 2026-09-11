@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ChatSession extends Model
 {
-    protected $fillable = ['key', 'title', 'is_open'];
+    protected $fillable = ['key', 'title', 'is_open', 'pi_session_id'];
 
     protected function casts(): array
     {

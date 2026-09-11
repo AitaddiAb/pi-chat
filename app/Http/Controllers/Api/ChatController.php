@@ -11,16 +11,47 @@ class ChatController extends Controller
 {
     public function sessions()
     {
-        return ChatSession::orderByDesc('updated_at')->limit(50)->get(['id', 'key', 'title', 'is_open', 'updated_at']);
+        return ChatSession::orderByDesc('updated_at')->limit(50)->get(['id', 'key', 'pi_session_id', 'title', 'is_open', 'updated_at']);
     }
 
-    // Pi calls this on start: claim a stable thread by key (idempotent).
+    // Pi calls this on start: 1 web chat per pi session (idempotent).
+    // - pi_session_id present → find by it (resume = same chat), else create.
+    // - legacy (no pi_session_id) → fall back to stable thread by key.
     public function claim(Request $request)
     {
         $data = $request->validate([
             'key' => 'required|string|max:64',
             'title' => 'nullable|string|max:120',
+            'pi_session_id' => 'nullable|string|max:64',
+            'fresh' => 'sometimes|boolean',
         ]);
+
+        if (! empty($data['pi_session_id'])) {
+            if (! empty($data['fresh'])) {
+                // Force a brand-new web chat for this pi session: detach the
+                // old mapping (history stays) then create fresh.
+                ChatSession::where('pi_session_id', $data['pi_session_id'])->update(['pi_session_id' => null]);
+                $session = ChatSession::create([
+                    'key' => $data['key'],
+                    'title' => $data['title'] ?? $data['key'],
+                    'pi_session_id' => $data['pi_session_id'],
+                    'is_open' => true,
+                ]);
+
+                return response()->json($session->only('id', 'key', 'pi_session_id', 'title', 'is_open'));
+            }
+            $session = ChatSession::firstOrCreate(
+                ['pi_session_id' => $data['pi_session_id']],
+                ['key' => $data['key'], 'title' => $data['title'] ?? $data['key']]
+            );
+            $session->update([
+                'is_open' => true,
+                'key' => $data['key'],
+                'title' => $data['title'] ?? $session->title,
+            ]);
+
+            return response()->json($session->only('id', 'key', 'pi_session_id', 'title', 'is_open'));
+        }
 
         $session = ChatSession::firstOrCreate(
             ['key' => $data['key']],
@@ -28,7 +59,7 @@ class ChatController extends Controller
         );
         $session->update(['is_open' => true, 'title' => $data['title'] ?? $session->title]);
 
-        return response()->json($session->only('id', 'key', 'title', 'is_open'));
+        return response()->json($session->only('id', 'key', 'pi_session_id', 'title', 'is_open'));
     }
 
     // Paginated-tail read. `after_id` = only rows the client hasn't seen (for polling).
@@ -47,7 +78,7 @@ class ChatController extends Controller
         }
 
         return response()->json([
-            'session' => $session->only('id', 'key', 'title', 'is_open'),
+            'session' => $session->only('id', 'key', 'pi_session_id', 'title', 'is_open'),
             'messages' => $rows->map(fn (ChatMessage $m) => [
                 'id' => $m->id,
                 'role' => $m->role,

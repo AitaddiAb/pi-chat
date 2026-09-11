@@ -6,7 +6,7 @@
 <a href="{{ route('chat.show', $s) }}" style="text-decoration:none;color:inherit">
 <div class="card">
 <strong>{{ $s->title }}</strong>
-<span class="dim">· {{ $s->is_open ? '🟢 open' : '⚪ closed' }} · updated {{ $s->updated_at->diffForHumans() }}</span>
+<span class="dim">· #{{ $s->id }} · {{ $s->key }}@if($s->pi_session_id) · pi {{ substr($s->pi_session_id, 0, 8) }}@endif · {{ $s->is_open ? '🟢 open' : '⚪ closed' }} · updated {{ $s->updated_at->diffForHumans() }}</span>
 </div>
 </a>
 @empty
