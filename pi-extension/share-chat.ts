@@ -174,13 +174,18 @@ export default function (pi: ExtensionAPI) {
       // Only human messages from devices come back into pi. Everything pi
       // posted itself (assistant/tool/status, local users) is skipped.
       if (m?.role === "user" && m?.via === "web" && typeof m?.text === "string" && m.text.trim()) {
-        const text = String(m.text).slice(0, 4000);
+        let text = String(m.text).slice(0, 4000);
+        // Remote alias: /compact is a built-in TUI command pi can't receive
+        // as a message — rewrite to our extension command (runs ctx.compact()).
+        if (/^\/compact(\s|$)/.test(text)) text = text.replace(/^\/compact/, "/rcompact");
+        // Commands must arrive leading-"/": prompt() only executes those as
+        // extension commands (needs expandPromptTemplates below).
         try {
-          if (S.busy) pi.sendUserMessage(text, { deliverAs: "followUp" });
-          else pi.sendUserMessage(text);
+          if (S.busy && !text.startsWith("/")) pi.sendUserMessage(text, { deliverAs: "followUp" });
+          else pi.sendUserMessage(text, { expandPromptTemplates: true } as any);
         } catch (err: any) {
           try {
-            pi.sendUserMessage(text, { deliverAs: "followUp" });
+            await post("status", `send failed (${err?.message ?? err})${text.startsWith("/") ? " — commands only run while pi is idle, resend when it settles" : ""}`, { via: "pi" });
           } catch {
             /* drop */
           }
@@ -213,7 +218,7 @@ export default function (pi: ExtensionAPI) {
     try {
       const s = await api("/api/chat/sessions/claim", {
         method: "POST",
-        body: JSON.stringify({ key: S.key, title: `${S.key} · ${ctx.cwd ?? ""}`.slice(0, 120) }),
+        body: JSON.stringify({ key: S.key, title: `${S.key} · ${ctx?.cwd ?? process.cwd()}`.slice(0, 120) }),
       });
       // Claim runs before S.on is set, so use fetch directly via api() — S.base/token already set.
       S.sessionId = s.id;
@@ -247,7 +252,14 @@ export default function (pi: ExtensionAPI) {
     } catch (err: any) {
       S.on = false;
       S.sessionId = null;
-      ctx.ui.notify(`share-chat failed: ${err?.message ?? err} — is the Laravel app running at ${S.base}?`, "error");
+      if (ctx) ctx.ui.notify(`share-chat failed: ${err?.message ?? err} — is the Laravel app reachable at ${S.base}?`, "error");
+      else {
+        try {
+          console.error(`[share-chat] start failed: ${err?.message ?? err}`);
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }
 
@@ -313,6 +325,14 @@ export default function (pi: ExtensionAPI) {
     handler: async (_args, ctx) => stop(ctx),
   });
 
+  pi.registerCommand("rcompact", {
+    description: "Compact context remotely (web /compact alias)",
+    handler: async (_args, ctx) => {
+      ctx.ui.notify("🗜 Compacting context (requested from web)…", "info");
+      (ctx as any).compact?.();
+    },
+  });
+
   pi.on("agent_start", async () => {
     S.busy = true;
   });
@@ -348,6 +368,15 @@ export default function (pi: ExtensionAPI) {
         /* ignore */
       }
       stop(undefined, true);
+    }
+  });
+
+  pi.on("session_compact", async () => {
+    if (!S.on) return;
+    try {
+      await post("status", "context compacted 🗜", { via: "pi" });
+    } catch {
+      /* best effort */
     }
   });
 }

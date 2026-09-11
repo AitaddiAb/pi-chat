@@ -33,6 +33,7 @@ class ChatWebController extends Controller
     {
         return response()->json(['commands' => [
             ['name' => '/share-chat-status', 'description' => 'Show bridge status in pi'],
+            ['name' => '/rcompact', 'description' => 'Compact pi context (remote /compact)'],
             ['name' => '/unshare-chat', 'description' => 'Stop bridging this session'],
             ['name' => '/help', 'description' => 'List pi commands'],
         ]]);
