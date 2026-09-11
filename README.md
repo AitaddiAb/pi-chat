@@ -29,19 +29,21 @@ php artisan serve --host=127.0.0.1 --port=62880
 
 ## Bridge pi to it
 
-```bash
-export PI_CHAT_URL="http://127.0.0.1:62880"
-export PI_CHAT_TOKEN="<pi-bot sanctum token>"
-export PI_CHAT_KEY="my-project"   # stable thread per project (optional)
+Config lives in global pi configuration — `~/.pi/agent/share-chat.json`:
+
+```json
+{ "url": "http://127.0.0.1:62880", "token": "<bot token from /settings>", "key": "PI" }
 ```
 
-In pi: `/share-chat` (flags `--key`, `--url` override env).
-Then open the printed `/chat/{id}` link in any browser and chat.
+Precedence: `/share-chat` flags > env (`PI_CHAT_URL`, `PI_CHAT_TOKEN`,
+`PI_CHAT_KEY`) > this file > defaults. Then in pi just run `/share-chat`
+(flags `--key`, `--url` still override) and open the printed `/chat/{id}` link.
 
-Mint a fresh bot token any time:
+Mint a fresh bot token any time (rotates the old one):
 
 ```bash
-php artisan tinker --execute='$u=\App\Models\User::where("email","pi@local")->first(); echo $u->createToken("pi-bot")->plainTextToken.PHP_EOL;'
+php artisan db:seed --force
+# or: SEED_USER_PASSWORD=secret php artisan db:seed --force  (first run sets it)
 ```
 
 ## Expose publicly (stable URL)
@@ -52,7 +54,7 @@ Serve via your Cloudflare named tunnel, e.g. ingress
 
 ## Notes
 
-- DB is SQLite (`database/database.sqlite`) — switch to MySQL in `.env` whenever.
+- DB is MySQL (`pi_chat` on local Homebrew MySQL) — configured in `.env`.
 - v1 uses 2s polling, no websockets. Upgrade path: Laravel Reverb +
   broadcast on `ChatMessage` created.
 - Token in `PI_CHAT_TOKEN` is full account access — keep it in env, never in chat.

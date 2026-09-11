@@ -24,6 +24,9 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 interface ChatState {
   on: boolean;
@@ -39,7 +42,33 @@ interface ChatState {
 }
 
 function cfg(name: string, fallback = ""): string {
-  return process.env[name] || fallback;
+  if (process.env[name]) return process.env[name] as string;
+  const f = loadFileCfg();
+  if (name === "PI_CHAT_URL" && f.url) return f.url;
+  if (name === "PI_CHAT_TOKEN" && f.token) return f.token;
+  if (name === "PI_CHAT_KEY" && f.key) return f.key;
+  return fallback;
+}
+
+// Global pi configuration: ~/.pi/agent/share-chat.json
+//   { "url": "http://127.0.0.1:62880", "token": "...", "key": "PI" }
+// Precedence: /share-chat flags > env vars > this file > defaults.
+interface FileCfg {
+  url?: string;
+  token?: string;
+  key?: string;
+}
+let fileCfg: FileCfg | null = null;
+function loadFileCfg(): FileCfg {
+  if (fileCfg) return fileCfg;
+  fileCfg = {};
+  try {
+    const raw = readFileSync(join(homedir(), ".pi", "agent", "share-chat.json"), "utf8");
+    fileCfg = { ...(JSON.parse(raw) as FileCfg) };
+  } catch {
+    /* missing or invalid → ignore, fall back to env/defaults */
+  }
+  return fileCfg;
 }
 
 /** Extract readable text from pi message content (string | array parts). */

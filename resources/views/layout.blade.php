@@ -28,6 +28,7 @@ button:disabled{opacity:.5}
 <div class="right">
 @auth
 <span class="dim">{{ auth()->user()->email }}</span>
+@if(auth()->user()->is_admin)<a href="{{ route('settings.index') }}">⚙️</a>@endif
 <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" style="padding:6px 12px;font-size:13px">Out</button></form>
 @endauth
 </div>

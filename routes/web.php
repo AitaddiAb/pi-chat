@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ChatWebController;
+use App\Http\Controllers\SettingsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -30,4 +31,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/chat/{session}', [ChatWebController::class, 'show'])->name('chat.show');
     Route::get('/chat/{session}/tail', [ChatWebController::class, 'tail'])->name('chat.tail');
     Route::post('/chat/{session}/send', [ChatWebController::class, 'send'])->name('chat.send');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/tokens', [SettingsController::class, 'storeToken'])->name('settings.tokens.store');
+    Route::delete('/settings/tokens/{id}', [SettingsController::class, 'destroyToken'])->name('settings.tokens.destroy');
 });
