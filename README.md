@@ -15,7 +15,10 @@ open a session, and chat — the local pi agent runs your messages.
   `~/.pi/agent/extensions/`). Outbound: transcript → API. Inbound: polls API,
   injects web messages into pi.
 
-## Run it (local)
+## Run it
+
+Production backend is the remote server behind `https://pi.abdrahim.dev`
+(not this copy). For local dev only:
 
 ```bash
 cd ~/Developer/Projects/PiPlugins/pi-chat
@@ -38,6 +41,9 @@ Config lives in global pi configuration — `~/.pi/agent/share-chat.json`:
 Precedence: `/share-chat` flags > env (`PI_CHAT_URL`, `PI_CHAT_TOKEN`,
 `PI_CHAT_KEY`) > this file > defaults. Then in pi just run `/share-chat`
 (flags `--key`, `--url` still override) and open the printed `/chat/{id}` link.
+Input is multi-line: **Enter** adds a new line, **⌘/Ctrl+Enter** (or Send)
+sends. Typing **`/`** shows pi command suggestions (`GET /chat/commands`)
+— picking one inserts it, and sending delivers it to pi.
 
 Mint a fresh bot token any time (rotates the old one):
 

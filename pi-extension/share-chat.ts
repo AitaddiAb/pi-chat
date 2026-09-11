@@ -57,6 +57,7 @@ interface FileCfg {
   url?: string;
   token?: string;
   key?: string;
+  autostart?: boolean;
 }
 let fileCfg: FileCfg | null = null;
 function loadFileCfg(): FileCfg {
@@ -188,17 +189,25 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  async function start(ctx: any, opts: { key?: string; url?: string }) {
+  async function start(ctx: any | undefined, opts: { key?: string; url?: string }) {
     if (S.on) {
-      ctx.ui.notify(`share-chat already on → session #${S.sessionId} (${S.key})`, "info");
+      if (ctx) ctx.ui.notify(`share-chat already on → session #${S.sessionId} (${S.key})`, "info");
       return;
     }
     S.base = (opts.url || cfg("PI_CHAT_URL", "http://127.0.0.1:62880")).replace(/\/+$/, "");
     S.token = cfg("PI_CHAT_TOKEN");
     S.key =
-      opts.key || cfg("PI_CHAT_KEY") || String(ctx.cwd || "pi").split("/").filter(Boolean).pop() || "pi";
+      opts.key || cfg("PI_CHAT_KEY") || String(ctx?.cwd || process.cwd()).split("/").filter(Boolean).pop() || "pi";
     if (!S.token) {
-      ctx.ui.notify("share-chat needs PI_CHAT_TOKEN (Sanctum pi-bot token). export it, then retry.", "error");
+      const msg = "share-chat needs a token: set \"token\" in ~/.pi/agent/share-chat.json (or PI_CHAT_TOKEN), then /share-chat.";
+      if (ctx) ctx.ui.notify(msg, "error");
+      else {
+        try {
+          console.error(`[share-chat] ${msg}`);
+        } catch {
+          /* ignore */
+        }
+      }
       return;
     }
     try {
@@ -222,12 +231,19 @@ export default function (pi: ExtensionAPI) {
       if (S.poll) clearInterval(S.poll);
       S.poll = setInterval(() => void pollInbound(), 2000);
       try {
-        (ctx.ui as any).setStatus?.("share-chat", `💬 chat #${S.sessionId}`);
+        (ctx?.ui as any)?.setStatus?.("share-chat", `💬 chat #${S.sessionId}`);
       } catch {
         /* ignore */
       }
-      ctx.ui.notify(`💬 Chat bridged → ${S.base}/chat/${S.sessionId} (key "${S.key}")`, "info");
-      await post("status", `pi connected · cwd ${ctx.cwd ?? ""}`, { via: "pi" });
+      if (ctx) ctx.ui.notify(`💬 Chat bridged → ${S.base}/chat/${S.sessionId} (key "${S.key}")`, "info");
+      else {
+        try {
+          console.error(`[share-chat] bridged → ${S.base}/chat/${S.sessionId} (key "${S.key}")`);
+        } catch {
+          /* ignore */
+        }
+      }
+      await post("status", `pi connected · cwd ${ctx?.cwd ?? process.cwd()}`, { via: "pi" });
     } catch (err: any) {
       S.on = false;
       S.sessionId = null;
@@ -248,6 +264,28 @@ export default function (pi: ExtensionAPI) {
     }
     if (ctx && !silent && was) ctx.ui.notify("Chat bridge stopped.", "info");
     if (ctx && !silent && !was) ctx.ui.notify("share-chat is not running.", "warning");
+  }
+
+  // Autostart: begin bridging as soon as pi loads, no command needed.
+  // Enabled by `"autostart": true` in ~/.pi/agent/share-chat.json (or
+  // PI_CHAT_AUTOSTART=1 to force). Guarded to interactive terminals so
+  // one-shot / non-TTY pi runs don't claim sessions.
+  {
+    const f = loadFileCfg();
+    const forced = process.env.PI_CHAT_AUTOSTART === "1";
+    if (
+      (f.autostart === true || forced) &&
+      (forced || !!process.stdin?.isTTY) &&
+      (f.token || process.env.PI_CHAT_TOKEN)
+    ) {
+      void start(undefined, {}).catch((err: any) => {
+        try {
+          console.error(`[share-chat] autostart failed: ${err?.message ?? err}`);
+        } catch {
+          /* ignore */
+        }
+      });
+    }
   }
 
   pi.registerCommand("share-chat", {

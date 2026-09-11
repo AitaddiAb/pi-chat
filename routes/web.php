@@ -28,6 +28,7 @@ Route::post('/logout', function (Request $request) {
 
 Route::middleware('auth')->group(function () {
     Route::get('/chat', [ChatWebController::class, 'index'])->name('chat.index');
+    Route::get('/chat/commands', [ChatWebController::class, 'commands'])->name('chat.commands');
     Route::get('/chat/{session}', [ChatWebController::class, 'show'])->name('chat.show');
     Route::get('/chat/{session}/tail', [ChatWebController::class, 'tail'])->name('chat.tail');
     Route::post('/chat/{session}/send', [ChatWebController::class, 'send'])->name('chat.send');

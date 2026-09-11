@@ -27,6 +27,17 @@ class ChatWebController extends Controller
         return response()->json(['messages' => $rows]);
     }
 
+    // Slash-command suggestions for the web input (also executable: the
+    // bridge delivers them to pi as the next message).
+    public function commands()
+    {
+        return response()->json(['commands' => [
+            ['name' => '/share-chat-status', 'description' => 'Show bridge status in pi'],
+            ['name' => '/unshare-chat', 'description' => 'Stop bridging this session'],
+            ['name' => '/help', 'description' => 'List pi commands'],
+        ]]);
+    }
+
     public function send(Request $request, ChatSession $session)
     {
         if (! $session->is_open) {
